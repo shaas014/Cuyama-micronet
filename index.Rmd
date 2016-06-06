@@ -1,0 +1,547 @@
+---
+title:
+author: "cjlortie"
+date: "May 2016"
+output:
+  html_document:
+    theme: yeti
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+###Cuyama Valley micronet
+The hypothesis tested is that shrubs directly and indirectly buffer local changes in the microenvironment thereby functioning as refuges for other species within arid and semi-arid regions subject to dramatic global change drivers.  To examine this hypothesis for Santa Barbara County, the following predictions will be tested: (i) shrub micro-environments reduce the level of stress and amplitude of variation associated with temperature and moisture, (ii) many plant and animal species including threatened lizards are relatively more common with shrubs within the region, and (iii) the variation in the interaction patterns between species relates to the extent of amelioration provided by shrub-biodiversity complexes within the region.  
+
+![](./pics/cuyama.JPG)
+
+[ecoblender](http://ecoblender.org)
+
+```{r library setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+#library loads ####
+library(dplyr)
+library(lme4)
+library(lattice)
+library(latticeExtra)
+library(lsmeans)
+
+
+##load functions ####
+error.bar <- function(x, y, upper, lower=upper, length=0,...){
+  if(length(x) != length(y) | length(y) !=length(lower) | length(lower) != length(upper))
+    stop("vectors must be same length")
+  arrows(x,y+upper, x, y-lower, angle=90, code=3, length=0, ...)
+}
+se <- function(x) sd(x)/sqrt(length(x)) ## SE
+```
+
+
+
+### macro-climate analyses: 1980-2005
+
+``` {r macroclimate 1980-2015, echo=FALSE, warning=FALSE}
+## load daymet data
+climate <- read.table("daymet.data.csv", header=T, sep=",")
+climate <- subset(climate, julian.day<151) ## subset for growing season only (Jan to May)
+
+##Process all macroclimate (and micro) by growing and non-season months. Growing is months 1-5.
+
+## collapse by year for all variables except precipitation
+climate.data <- aggregate(climate, by=list(year=climate$year, site=climate$site), mean)
+
+## sum total annual precipitation                                       
+annual.precip <- aggregate(climate$prcp, by=list(year=climate$year, site=climate$site), sum)
+climate.data["prcp"] <- annual.precip[,3] #replace precipitation with annual sum rather than daily mean
+climate.data["aridity"] <- climate.data[,"prcp"]/(climate.data[,"tmax"]+10)
+
+## data 1980-2015
+## means, totals, and error
+climate.data2005 <- subset(climate.data, year < 2005)
+
+means <- aggregate(climate.data2005, by=list(site=climate.data2005$site), mean)
+ses <- aggregate(climate.data2005, by=list(site=climate.data2005$site), se)
+site <- seq(1,6,1)
+means2005 <- means ## for microclimate correlations
+
+## plot figures for precipitation and temperature max
+hist(climate.data2005$tmax, main="", xlab="max temperature (°C)", ylab="frequency")
+hist(climate.data2005$prcp, main="", xlab="precipitation (mm)", ylab="frequency")
+
+par(mar=c(4.5,5,.5,4.5))
+plot(site-0.1, means[,"tmax"],  ylim=c(16,22), pch=19, xlim=c(0.7,6.3), cex=1, ylab="max temperature (C°)", cex.axis=1, cex.lab=1, xlab="site")
+error.bar(site-0.1, means[,"tmax"],ses[,"tmax"])
+par(new = T)
+plot(site+0.1, means[,"prcp"], xaxt="n",yaxt="n", ylim=c(150,350),xlim=c(0.7,6.3),  pch=21, bg="White", cex=1, xlab="", ylab="")
+error.bar(site+0.1,means[,"prcp"],ses[,"prcp"])
+points(site+0.1,means[,"prcp"], pch=21, bg="White", cex=1)
+axis(4, cex.axis=1)
+mtext("annual precipitation (mm)", side = 4, line = 3, cex = 1)
+
+#GLM temperature among sites
+m1 <- glm((tmax^2)~site, data=climate.data2005)
+anova(m1, test="Chisq")
+lsmeans(m1, pairwise~site, adjust="tukey")
+
+#GLM precipitation among sites
+m2 <- glm((prcp^2)~site, data=climate.data2005)
+anova(m2, test="Chisq")
+lsmeans(m2, pairwise~site, adjust="tukey")
+
+```
+
+
+### macro-climate analyses: 2005-2015
+``` {r macroclimate 2005-2015, echo=FALSE, warning=FALSE}
+## data 2005-2015
+## means, totals, and error
+climate.data2015 <- subset(climate.data, year>2004)
+means <- aggregate(climate.data2015, by=list(site=climate.data2015$site), mean)
+ses <- aggregate(climate.data2015, by=list(site=climate.data2015$site), se)
+site <- seq(1,6,1)
+
+## plot figures for precipitation and temperature max
+par(mar=c(4.5,5,.5,4.5))
+plot(site-0.1, means[,"tmax"],  ylim=c(16,22), pch=19, xlim=c(0.7,6.3), cex=1, ylab="temperature max (C°)", cex.axis=1, cex.lab=1, xlab="site")
+error.bar(site-0.1, means[,"tmax"],ses[,"tmax"])
+par(new = T)
+plot(site+0.1, means[,"prcp"], xaxt="n",yaxt="n", ylim=c(150,350),xlim=c(0.7,6.3),  pch=21, bg="White", cex=1, xlab="", ylab="")
+error.bar(site+0.1,means[,"prcp"],ses[,"prcp"])
+points(site+0.1,means[,"prcp"], pch=21, bg="White", cex=1)
+axis(4, cex.axis=1, cex.axis=1)
+mtext("annual precipitation (mm)", side = 4, line = 3, cex = 1)
+
+#GLM temperature among sites
+m3 <- glm((tmax^2)~site, data=climate.data2015)
+anova(m3, test="Chisq")
+lsmeans(m3, pairwise~site, adjust="tukey")
+
+#GLM precipitation among sites
+m4 <- glm((prcp^2)~site, data=climate.data2015)
+anova(m4, test="Chisq")
+lsmeans(m4, pairwise~site, adjust="tukey")
+
+```
+
+``` {r elevation and climate, echo=FALSE, message=FALSE, warning=FALSE}
+source('cuyama.elevation.R')
+
+cor(alt.site["elevation"], means[,7:12]) ## strong correlation between alt and temperature. Medium precip and VP
+par(mar=c(4.5,5,.5,.5))
+plot(alt.site[,"elevation"],means[,"tmax"], pch=19,  ylim=c(16,22), cex=1, xlim=c(400,1000), ylab="temperature max (C°)", xlab="site elevation", cex.axis=1, cex.lab=1)
+m1 <- lm(means[,"tmax"]~alt.site[,"elevation"])
+abline(m1, lwd=2, lty=2)
+
+plot(alt.site[,"elevation"],means[,"prcp"], pch=19,  ylim=c(200,300), cex=1, xlim=c(400,1000), ylab="annual precipitation (mm)", xlab="site elevation", cex.axis=1, cex.lab=1)
+m2 <- lm(means[,"prcp"]~alt.site[,"elevation"])
+```
+
+```{r aridity index, echo=FALSE, warning=FALSE}
+#GLM de Martonne aridity index for 6 sites for 1980-2005
+
+AI<-climate.data$prcp/(climate.data$tmax +10)
+
+hist(AI, main="", xlab="aridity index", ylab="frequency")
+plot(AI~climate.data$site, xlab="", ylab="aridity index")
+
+#GLM
+ai.model<- glm(AI~climate.data$site, family = gaussian)
+plot(ai.model)
+anova(ai.model, test="Chisq")
+
+```
+
+### micro-climate analyses: 02/2016
+
+```{r microclimatic analyses, echo=FALSE, fig.width=10, fig.height=5, warning=F, message=F}
+source('Hobo.data.processing.R')
+
+## plot microclimate findings just for February
+par(mfrow=c(1,2))
+par(mar=c(4.5,4.5,.5,.5))
+##temperature
+plot(Feb.shrub$site-0.1, Feb.shrub$temp, pch=19, cex=1, xlim=c(0.7,6.3), ylim=c(12,22), ylab="temperature (C°)", xlab="site", cex.axis=1, cex.lab=1)
+error.bar(Feb.shrub$site-0.1, Feb.shrub$temp, Feb.shrub.se$temp, lwd=2)
+error.bar(Feb.open$site+0.1, Feb.open$temp, Feb.open.se$temp, lwd=2)
+points(Feb.open$site+0.1, Feb.open$temp, pch=21, cex=1, bg="white")
+
+par(mar=c(4.5,5,.5,.5))
+##soil moisture
+plot(Feb.shrub$site-0.1, Feb.shrub$smc, pch=19, cex=1, xlim=c(0.7,6.3), ylim=c(0,0.3), ylab=expression("soil moisture (m"^"3"*"/m"^"3"*")"), xlab="site", cex.axis=1, cex.lab=1)
+error.bar(Feb.shrub$site-0.1, Feb.shrub$smc, Feb.shrub.se$smc, lwd=2)
+error.bar(Feb.open$site+0.1, Feb.open$smc, Feb.open.se$smc, lwd=2)
+points(Feb.open$site+0.1, Feb.open$smc, pch=21, cex=1, bg="white")
+legend(4.5,0.29, c("shrub","open"), pch=c(19,1), cex=1)
+
+#GLMS for temp & smc
+
+m1 <- lmer(temp~microsite * site + (1|month), data=hobo.data) #temp
+summary(m1)
+
+## Normal approximation to extract p-values from lmer
+## Barr, D. J., Levy, R., Scheepers, C., & Tily, H. J. (2013). Random effects structure for confirmatory hypothesis testing: Keep it maximal. Journal of memory and language, 68(3), 255-278.
+##http://mindingthebrain.blogspot.ca/2014/02/three-ways-to-get-parameter-specific-p.html
+
+coefs <- data.frame(coef(summary(m1))) # extract coefficients
+coefs$temp.pvalue <- 2 * (1 - pnorm(abs(coefs$t.value))) # use normal distribution to approximate p-value
+coefs
+
+m2 <- lmer(smc~microsite * site + (1|month), data=hobo.data)
+summary(m2)
+
+## Normal approximation to extract p-values from lmer
+## Barr, D. J., Levy, R., Scheepers, C., & Tily, H. J. (2013). Random effects structure for confirmatory hypothesis testing: Keep it maximal. Journal of memory and language, 68(3), 255-278.
+##http://mindingthebrain.blogspot.ca/2014/02/three-ways-to-get-parameter-specific-p.html
+
+coefs <- data.frame(coef(summary(m2))) # extract coefficients
+coefs$smc.pvalue <- 2 * (1 - pnorm(abs(coefs$t.value))) # use normal distribution to approximate p-value
+
+```
+
+###shrub morphology
+```{r shrub morphology, echo=FALSE, warning=FALSE}
+#shrub morphology ####
+#read data
+shrubs<-read.table("data/shrub.size.csv", sep=",", header=T)
+
+#size size (volume)
+#parse data into sites and calculate se
+n<-length(shrubs$rep)
+patterns <- shrubs %>%
+  group_by(site) %>%
+  summarize(size = mean(shrub.size), error = (sd(shrub.size))/sqrt(n)) 
+write.csv(patterns, "shrubsize.csv")
+
+#plot
+plot(patterns$size~patterns$site, xlab="Cuyama sites", ylab="mean shrub sizes (m3)", pch=17)
+error.bar <- function(x, y, upper, lower=upper, length=0.1,...){
+if(length(x) != length(y) | length(y) !=length(lower) | length(lower) != length(upper))
+stop("vectors must be same length")
+  arrows(x,y+upper, x, y-lower, angle=90, code=3, length=0, ...)
+}
+error.bar(patterns$site,patterns$size,patterns$error)
+
+#size height
+#parse data into sites and calculate se
+n<-length(shrubs$rep)
+height <- shrubs %>%
+  group_by(site) %>%
+  summarize(shrub.height= mean(z), error = (sd(z))/sqrt(n))
+
+#plot
+plot(height$shrub.height~height$site, xlab="Cuyama sites", ylab="mean shrub heights (m)", ylim=c(0,2), pch=17)
+error.bar(height$site,height$shrub.height,height$error)            
+
+#GLMs
+shrubs.model<-glm(shrub.size~site, family=gaussian, data=shrubs)
+plot(shrubs.model)
+anova(shrubs.model, test="Chisq")
+
+
+shrubs.height<-glm(z~site, family=gaussian, data=shrubs)
+plot(shrubs.height)
+anova(shrubs.height, test="Chisq")
+
+```
+
+###burrow patterns within Cuyama
+``` {r burrow patterns, echo=FALSE, warning=FALSE, message=FALSE}
+#shrub-open contrast of burrows
+#read data
+burrows<-read.table("data/burrows.csv", sep=",", header=T)
+
+#burrow frequency
+#parse data into sites/microsites and calculate se
+n<-length(burrows$burrows)
+burrows.summary<- burrows %>%
+  group_by(site, microsite) %>%
+  summarize(frequency = mean(burrows), se = (sd(burrows))/sqrt(n))
+
+#plot
+interaction.plot(burrows.summary$site,burrows.summary$microsite,
+     burrows.summary$frequency, xlab="Cuyama sites", ylab="burrows", ylim=c(0,38),trace.label="")
+
+error.bar(burrows.summary$site, burrows.summary$frequency,burrows.summary$se)
+points(burrows.summary$site, burrows.summary$frequency)
+
+#GLM
+burrows.model<-glm(burrows~microsite*site, family=poisson, data=burrows) ## deviance >>>> df
+library(MASS) ## load separately to avoid conflict with dplyr
+burrows.model<-glm.nb(burrows~microsite*as.factor(site), data=burrows) ## negative binomial
+plot(burrows.model)
+anova(burrows.model, test="Chisq")
+lsmeans(burrows.model, pairwise~ microsite*site)
+```
+
+###vegetation patterns
+
+```{r vegetation patterns, echo=FALSE, warning=FALSE}
+source('veg.patterns.R')
+
+#Cuyama GLM analyses for all veg
+print("all vegetation", quote=FALSE)
+#richness
+veg.model1<-glm(veg$richness~site*microsite, family=poisson, data=veg)
+plot(veg.model1)
+anova(veg.model1, test="Chisq")
+
+#density
+veg.model2<-glm(veg$total.density~site*microsite, family=gaussian, data=veg)
+plot(veg.model2)
+anova(veg.model2, test="Chisq")
+
+#native species ####
+print("native and exotic species processed independently", quote=FALSE)
+#richness
+#parse data into sites/microsites and calculate se
+n <-length(veg$richness)
+native.richness <- veg %>%
+  group_by(site,microsite) %>%
+  summarize(species = mean(native.richness), se = (sd(native.richness))/sqrt(n)) 
+head(native.richness)
+
+#plot native richness
+interaction.plot(native.richness$site, native.richness$microsite, native.richness$species, xlab="sites", ylab="native species richness", ylim=c(0,2.5), trace.label="")
+points(native.richness$site, native.richness$species)
+error.bar(native.richness$site,native.richness$species,native.richness$se)
+
+#model
+native.model1<-glm(veg$native.richness~site*microsite, family=poisson, data=veg)
+plot(native.model1)
+anova(veg.model1, test="Chisq")
+
+#density
+#parse data into sites/microsites and calculate se
+n <-length(veg$total.density)
+native.density <- veg %>%
+  group_by(site, microsite) %>%
+  summarize(density = mean(native.density), error = (sd(native.density))/sqrt(n)) 
+
+#plot
+interaction.plot(native.density$site, native.density$microsite, native.density$density, xlab="sites", ylab="native plant density", trace.label="")
+points(native.density$site, native.density$density)
+error.bar(native.density$site,native.density$density,native.density$error)
+
+#model
+native.model2<-glm(veg$native.density~site*microsite, family=gaussian, data=veg)
+plot(native.model2)
+anova(native.model2, test="Chisq")
+
+#exotic species ####
+#richness
+#parse data into sites/microsites and calculate se
+n <-length(veg$richness)
+exotic.richness <- veg %>%
+  group_by(site,microsite) %>%
+  summarize(species = mean(exotic.richness), se = (sd(exotic.richness))/sqrt(n)) 
+head(exotic.richness)
+
+#plot native richness
+interaction.plot(exotic.richness$site, exotic.richness$microsite, exotic.richness$species, xlab="sites", ylab="exotic species richness", ylim=c(0,2.5), trace.label="")
+points(exotic.richness$site, exotic.richness$species)
+error.bar(exotic.richness$site,exotic.richness$species,exotic.richness$se)
+
+#model
+exotic.model1<-glm(veg$exotic.richness~site*microsite, family=poisson, data=veg)
+plot(exotic.model1)
+anova(exotic.model1, test="Chisq")
+
+#density
+#parse data into sites/microsites and calculate se
+n <-length(veg$exotic.density)
+exotic.density <- veg %>%
+  group_by(site, microsite) %>%
+  summarize(density = mean(exotic.density), error = (sd(exotic.density))/sqrt(n)) 
+
+#plot
+interaction.plot(exotic.density$site, exotic.density$microsite, exotic.density$density, xlab="sites", ylab="exotic plant density", trace.label="")
+points(exotic.density$site, exotic.density$density)
+error.bar(exotic.density$site,exotic.density$density,exotic.density$error)
+
+#model
+exotic.model2<-glm(veg$exotic.density~site*microsite, family=gaussian, data=veg)
+plot(exotic.model2)
+anova(exotic.model2, test="Chisq")
+
+#proportion invaded
+#richness
+#parse data into sites/microsites and calculate se
+n <-length(veg$prop.species.invaded)
+prop.invaded <- veg %>%
+  group_by(site,microsite) %>%
+  summarize(species = mean(prop.species.invaded), se = (sd(prop.species.invaded))/sqrt(n)) 
+
+
+#plot
+interaction.plot(prop.invaded$site, prop.invaded$microsite, prop.invaded$species, xlab="sites", ylab="proportion of exotic species", ylim=c(0,1), trace.label="")
+points(prop.invaded$site, prop.invaded$species)
+error.bar(prop.invaded$site,prop.invaded$species,prop.invaded$se)
+
+#model
+exotic.model3<-glm(veg$prop.species.invaded~site*microsite, family=gaussian, data=veg)
+plot(exotic.model3)
+anova(exotic.model3, test="Chisq")
+
+#density
+#parse data into sites/microsites and calculate se
+n <-length(veg$prop.density.invaded)
+prop.density.invaded <- veg %>%
+  group_by(site, microsite) %>%
+  summarize(density = mean(prop.density.invaded), error = (sd(prop.density.invaded))/sqrt(n)) 
+
+#plot
+interaction.plot(prop.density.invaded$site, prop.density.invaded$microsite, prop.density.invaded$density, xlab="sites", ylab="proportion exotic plant density", ylim=c(0,1), trace.label="")
+points(prop.density.invaded$site, prop.density.invaded$density)
+error.bar(prop.density.invaded$site,prop.density.invaded$density,prop.density.invaded$error)
+
+#model
+exotic.model4<-glm(veg$prop.density.invaded~site*microsite, family=gaussian, data=veg)
+plot(exotic.model4)
+anova(exotic.model4, test="Chisq")
+
+#Ordination analyses of vegetation (include native-exotic)
+
+```
+
+###shrub-annual interactions
+```{r rii for veg, echo=FALSE, warning=FALSE}
+#load rii function
+source("rii.R")
+
+#interaction analyses for Cuyama all veg
+#rii application
+data<-veg
+rii.veg<-rii(data, c("site","treatment"), c("total.density","richness"))
+
+#rename df cols
+colnames(rii.veg)[3] <-"rii.density"
+colnames(rii.veg)[4] <-"rii.richness"
+
+rii.veg <-rii.veg %>%
+  group_by(treatment == "unclipped")
+
+
+#plot riis
+#density
+n<-length(rii.veg$rii.density)
+rii.mean.density <- rii.veg %>%  
+  group_by(site) %>%
+  summarize(meandensity = mean(rii.density), error = (sd(rii.density))/sqrt(n)) 
+
+plot(rii.mean.density$meandensity~rii.mean.density$site, xlab="site", ylab="rii.density", ylim=c(-1,1))
+error.bar(rii.mean.density$site, rii.mean.density$meandensity,
+          rii.mean.density$error)
+abline(h=0, lty=2)
+
+#richness
+n<-length(rii.veg$rii.richness)
+rii.mean.richness <- rii.veg %>%  
+  group_by(site) %>%
+  summarize(meanrichness = mean(rii.richness), error = (sd(rii.richness))/sqrt(n)) 
+
+plot(rii.mean.richness$meanrichness~rii.mean.richness$site, xlab="site", ylab="rii.richness", ylim=c(-1,1))
+error.bar(rii.mean.richness$site, rii.mean.richness$meanrichness,
+          rii.mean.richness$error)
+abline(h=0, lty=2)
+
+#GLMS for rii
+#density
+rii.model1<-glm(rii.density~site, family=gaussian, data=rii.veg)
+plot(rii.model1)
+anova(rii.model1, test="Chisq")
+
+t.test(rii.veg$rii.density,mu=0)
+summary(rii.veg$rii.density)
+
+#richness
+rii.model2<-glm(rii.richness~site, family=gaussian, data=rii.veg)
+plot(rii.model2)
+anova(rii.model2, test="Chisq")
+
+t.test(rii.veg$rii.richness,mu=0)
+summary(rii.veg$rii.richness)
+
+
+#interaction analyses for Cuyama native/exotic 
+
+
+```
+
+
+###advanced climate-shrub-community interaction analyses
+
+```{r advanced climate-community interactions, echo=FALSE, fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
+#1. Do shrubs have a lower amplitude of variation in temp and smc? use CV. 
+#read monthly
+x.hobo<-read.csv("HOBO.data.monthly.stats.csv")
+
+#growing season
+growing.season.means <- x.hobo %>%
+  group_by(month, site, microsite) %>%
+         filter(month == 2 | month == 3 | month ==4 | month ==5, statistic == "mean")
+growing.season.SD <- x.hobo %>%
+  group_by(month, site, microsite) %>%
+         filter(month == 2 | month == 3 | month ==4 | month ==5, statistic == "SD")
+
+#CV temp
+CVt <-growing.season.SD$temp/growing.season.means$temp
+
+#better plot
+bwplot(CVt~site|microsite, data = growing.season.means, horizontal = FALSE, ylab="CV temp.growing season 2016")
+
+
+
+CVtmodel <- glm(CVt~microsite*site, data=growing.season.means, family = gaussian())
+summary(CVtmodel)
+anova(CVtmodel, test="Chisq")
+#plot(CVmodelt)
+
+#CV smc
+CVs <-growing.season.means$smc/growing.season.SD$smc  
+
+#plots
+bwplot(CVs~site|microsite, data = growing.season.means, horizontal = FALSE, ylab="CV smc.growing season 2016")
+
+CVsmodel <- glm(CVs~microsite*site, family = gaussian(), data=growing.season.means)
+summary(CVsmodel)
+anova(CVsmodel, test="Chisq")
+#plot(CVmodelt)
+
+#NON-growing season # repeat once we have data
+
+#2.a. Is the weighted relative difference between shrub-open (LRR of means) predicted by shrub size - say volume.  Did not do this year.
+
+#2.b Does shrub size predict shrub microclimate. Answering now below.
+
+##add shrubs size to hobo data
+lookup <- read.table("data/sizes.loggercodes.csv", header=T, sep=",")
+hobo.size <- inner_join(hobo.data, lookup, by="logger")
+hobo.size["volume"] <- (1/3)*(hobo.size[,"x"]*hobo.size[,"y"]/4)*hobo.size[,"z"]*pi ## formula for a semi-sphere
+
+shrubs.hobo <- subset(hobo.size, microsite=="shrub")
+
+hobo.means <- aggregate(shrubs.hobo, by=list(logger=shrubs.hobo$logger),mean)
+hobo.se <- aggregate(shrubs.hobo, by=list(logger=shrubs.hobo$logger),se)
+
+## plot temperature against shrub size
+par(mfrow=c(1,2))
+plot(hobo.means[,"volume"],hobo.means[,"temp"], pch=hobo.means[,"site.x"]+19, bg="black", xlim=c(0,20), ylim=c(15,20),  xlab=expression("shrub volume (m"^3*")"), ylab="temperature (C°)")
+error.bar(hobo.means[,"volume"],hobo.means[,"temp"],hobo.se[,"temp"])
+
+## plot soil moisture against shrub size
+plot(hobo.means[,"volume"],hobo.means[,"smc"], pch=hobo.means[,"site.x"]+19, bg="black", xlim=c(0,20), ylim=c(0,0.3),  xlab=expression("shrub volume (m"^3*")"), ylab=expression("soil moisture (m"^"3"*"/m"^"3"*")"))
+error.bar(hobo.means[,"volume"],hobo.means[,"smc"],hobo.se[,"smc"])
+legend(15,0.29, c("site 1","site 2", "site 3", "site 4"), pch=c(20,21,24,25), pt.bg="black")
+
+
+## regressions of size vs microclimate
+m1 <- lm(temp~volume, data=hobo.means)
+m2 <- lm(smc~volume, data=hobo.means)
+
+summary(m1)
+summary(m2)
+
+#3. BONUS but sexy: Is the LRR(shrub-open mean temp & smc diffs) predicted by the rii veg? #FUN
+
+```
