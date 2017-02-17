@@ -18,10 +18,10 @@ The hypothesis tested is that shrubs directly and indirectly buffer local change
 
 [ecoblender](http://ecoblender.org)
 
-```{r library setup, include=FALSE}
+```{r library setup, message = FALSE, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 #library loads ####
-library(dplyr)
+library(tidyverse)
 library(lme4)
 library(lattice)
 library(latticeExtra)
